@@ -1,0 +1,50 @@
+# Script to disable Fast Startup (Hybrid Boot) on Windows
+# Compatible with Syncro RMM deployment
+
+# Function to write output that Syncro can capture
+function Write-SyncroLog {
+    param([string]$Message)
+    Write-Host $Message
+}
+
+try {
+    Write-SyncroLog "Starting Fast Startup disable process..."
+    
+    # Registry path for Fast Startup setting
+    $regPath = "HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Power"
+    $regName = "HiberbootEnabled"
+    
+    # Check if the registry path exists
+    if (!(Test-Path $regPath)) {
+        Write-SyncroLog "ERROR: Registry path does not exist: $regPath"
+        exit 1
+    }
+    
+    # Get current value
+    $currentValue = Get-ItemProperty -Path $regPath -Name $regName -ErrorAction SilentlyContinue
+    
+    if ($currentValue) {
+        Write-SyncroLog "Current Fast Startup status: $($currentValue.HiberbootEnabled) (0=Disabled, 1=Enabled)"
+    } else {
+        Write-SyncroLog "Fast Startup registry value does not exist. Creating it..."
+    }
+    
+    # Set the registry value to 0 (disabled)
+    Set-ItemProperty -Path $regPath -Name $regName -Value 0 -Type DWord -Force
+    
+    # Verify the change
+    $newValue = Get-ItemProperty -Path $regPath -Name $regName
+    
+    if ($newValue.HiberbootEnabled -eq 0) {
+        Write-SyncroLog "SUCCESS: Fast Startup has been disabled."
+        Write-SyncroLog "Note: A system restart is required for this change to take full effect."
+        exit 0
+    } else {
+        Write-SyncroLog "ERROR: Failed to disable Fast Startup. Current value: $($newValue.HiberbootEnabled)"
+        exit 1
+    }
+    
+} catch {
+    Write-SyncroLog "ERROR: An exception occurred: $($_.Exception.Message)"
+    exit 1
+}
